@@ -100,6 +100,31 @@ const LinkPreviewCard = ({ text }: { text: string }) => {
   );
 };
 
+const renderTextWithLinks = (text: string, isMe?: boolean) => {
+  if (!text) return "";
+  const urlRegex = /(https?:\/\/[^\s]+)/gi;
+  const parts = text.split(urlRegex);
+  if (parts.length === 1) return text;
+  
+  return parts.map((part, i) => {
+    if (part.match(urlRegex)) {
+      return (
+        <a 
+          key={i} 
+          href={part} 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          className={`underline break-all font-bold ${isMe ? 'text-white hover:text-emerald-100' : 'text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300'}`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {part}
+        </a>
+      );
+    }
+    return part;
+  });
+};
+
 const CallBubble = ({ msg }: { msg: any }) => {
   const isVideo = msg.text?.toLowerCase().includes('video') || msg.systemType === 'video';
   const timestamp = formatTime12h(msg.timestamp);
@@ -222,6 +247,8 @@ export default function Messages() {
   const channelIdParam = searchParams.get('channelId');
   const activeChannel = channelIdParam ? channels.find(c => c.id === channelIdParam) : null;
 
+  const [userShopName, setUserShopName] = useState<string>('');
+
   // Fetch Current User Role
   useEffect(() => {
     if (!user) return;
@@ -229,7 +256,9 @@ export default function Messages() {
       try {
         const docSnap = await getDoc(doc(db, 'users', user.uid));
         if (docSnap.exists()) {
-          setUserRole(docSnap.data().role || 'buyer');
+          const data = docSnap.data();
+          setUserRole(data.role || 'buyer');
+          setUserShopName(data.shopName || data.displayName || 'Seller');
         }
       } catch (err) {
         console.error("Error fetching user role:", err);
@@ -372,6 +401,70 @@ export default function Messages() {
     } catch(e) {
       console.error(e);
       notify("Failed to unsubscribe", "error");
+    }
+  };
+
+  const handleCreateChannel = async () => {
+    if (!user) return;
+    if (!chanName.trim()) {
+      notify("Please enter a channel name", "error");
+      return;
+    }
+    if (!chanLink.trim()) {
+      notify("Please enter a custom link or handle", "error");
+      return;
+    }
+    
+    setIsCreatingChannel(true);
+    try {
+      // Check if custom link (handle) already exists
+      const linkQuery = query(collection(db, 'community_channels'), where('customLink', '==', chanLink.trim().toLowerCase()));
+      const linkSnap = await getDocs(linkQuery);
+      if (!linkSnap.empty) {
+        notify("This custom link/handle is already taken. Please choose another one.", "error");
+        setIsCreatingChannel(false);
+        return;
+      }
+
+      // Default cover image if none provided
+      const finalImage = chanImage.trim() || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=150&q=80';
+
+      const newChannelDoc = {
+        name: chanName.trim(),
+        description: chanDesc.trim(),
+        customLink: chanLink.trim().toLowerCase(),
+        imageUrl: finalImage,
+        creatorId: user.uid,
+        creatorName: userShopName || user.displayName || 'Verified Seller',
+        subscriberCount: 1, // creator subscribes automatically
+        createdAt: Date.now()
+      };
+
+      const docRef = await addDoc(collection(db, 'community_channels'), newChannelDoc);
+
+      // Automatically subscribe the creator
+      const subRef = doc(db, 'community_channels', docRef.id, 'subscriptions', user.uid);
+      await setDoc(subRef, {
+        uid: user.uid,
+        displayName: user.displayName || 'Verified Seller',
+        photoURL: user.photoURL || '',
+        muted: false,
+        joinedAt: Date.now()
+      });
+
+      notify("Community Channel created successfully!", "success");
+      
+      // Reset fields
+      setChanName('');
+      setChanDesc('');
+      setChanLink('');
+      setChanImage('');
+      setShowCreateChannelModal(false);
+    } catch (err) {
+      console.error("Error creating channel:", err);
+      notify("Failed to create community channel", "error");
+    } finally {
+      setIsCreatingChannel(false);
     }
   };
 
@@ -748,6 +841,8 @@ export default function Messages() {
       setPreviewUrl(URL.createObjectURL(file));
     }
   };
+
+  const handleAttachmentChange = handleFileSelect;
 
   const uploadImage = async (file: File): Promise<string> => {
     const formData = new FormData();
@@ -1388,11 +1483,31 @@ export default function Messages() {
                  )
              ) : (
                  <div className="flex flex-col">
+                   {(userRole === 'seller' || userRole === 'admin') && (
+                     <div className="p-3 border-b border-zinc-100 dark:border-zinc-850 bg-emerald-50/40 dark:bg-emerald-950/10 shrink-0">
+                       <button
+                         onClick={() => setShowCreateChannelModal(true)}
+                         className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white font-bold text-xs shadow-md transition active:scale-95"
+                       >
+                         <Plus className="w-4 h-4" />
+                         <span>Create Community Channel</span>
+                       </button>
+                     </div>
+                   )}
+
                    {channels.length === 0 ? (
                      <div className="flex flex-col items-center justify-center h-64 text-zinc-400 p-6 text-center">
                        <Users className="w-12 h-12 mb-3 text-zinc-300 dark:text-zinc-700" />
                        <p className="font-medium text-sm">No community channels yet</p>
                        <p className="text-xs mt-1">Sellers can create a new channel to post updates!</p>
+                       {(userRole === 'seller' || userRole === 'admin') && (
+                         <button
+                           onClick={() => setShowCreateChannelModal(true)}
+                           className="mt-4 px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold text-xs hover:bg-emerald-700 transition"
+                         >
+                           Create Channel
+                         </button>
+                       )}
                      </div>
                    ) : (
                      channels.map(channel => {
@@ -1637,14 +1752,15 @@ export default function Messages() {
                                                   <img src={msg.imageUrl} alt="Post Attachment" className="w-full object-cover" />
                                               </div>
                                           )}
-                                                                       
-                                          {/* Post text */}
+                                                                                                      {/* Post text */}
                                           {msg.text && (
                                               <div 
                                                   onClick={(e) => { e.stopPropagation(); setActiveMessageMenuId(isMenuOpen ? null : msg.id); }}
                                                   className="px-4 py-2.5 rounded-2xl shadow-sm cursor-pointer select-none relative bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 rounded-bl-sm border border-zinc-200 dark:border-zinc-800"
                                               >
-                                                  <p className="text-[14px] leading-relaxed whitespace-pre-wrap break-words">{msg.text}</p>
+                                                  <p className="text-[14px] leading-relaxed whitespace-pre-wrap break-words">
+                                                      {renderTextWithLinks(msg.text, false)}
+                                                  </p>
                                                   
                                                   {/* URL Preview support */}
                                                   <LinkPreviewCard text={msg.text} />
@@ -1935,7 +2051,30 @@ export default function Messages() {
                                              >
                                                  Reply
                                              </button>
+                                             <button 
+                                                 onClick={(e) => {
+                                                     e.stopPropagation();
+                                                     setForwardingMessage({
+                                                        text: msg.text || "",
+                                                        imageUrl: msg.imageUrl || "",
+                                                        originalSenderName: msg.senderId === user.uid ? "You" : (activeChat.otherUser?.shopName || activeChat.otherUser?.displayName || "User")
+                                                     });
+                                                     setShowForwardModal(true);
+                                                     setActiveMessageMenuId(null);
+                                                 }}
+                                                 className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider px-2 py-0.5 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-md"
+                                             >
+                                                 Forward
+                                             </button>
                                          </motion.div>
+                                     )}
+
+                                     {/* Forwarded Header (if any) */}
+                                     {msg.forwardedFrom && (
+                                       <div className={`flex items-center gap-1 text-[10px] ${isMe ? 'text-emerald-200' : 'text-zinc-400 dark:text-zinc-500'} font-bold mb-1 italic`}>
+                                         <Forward className="w-3 h-3" />
+                                         <span>Forwarded from {msg.forwardedFrom}</span>
+                                       </div>
                                      )}
 
                                      {/* Replying to quoted message preview inside bubble */}
@@ -1962,7 +2101,10 @@ export default function Messages() {
                                              onClick={(e) => { e.stopPropagation(); setActiveMessageMenuId(isMenuOpen ? null : msg.id); }}
                                              className={`px-4 py-2.5 rounded-2xl shadow-sm cursor-pointer select-none relative ${isMe ? 'bg-emerald-600 text-white rounded-br-sm' : 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 rounded-bl-sm border border-zinc-200 dark:border-zinc-800'}`}
                                          >
-                                             <p className="text-[14px] leading-relaxed whitespace-pre-wrap break-words">{msg.text}</p>
+                                             <p className="text-[14px] leading-relaxed whitespace-pre-wrap break-words">
+                                                 {renderTextWithLinks(msg.text, isMe)}
+                                             </p>
+                                             <LinkPreviewCard text={msg.text} isMe={isMe} />
                                          </div>
                                      )}
 
@@ -2291,8 +2433,8 @@ export default function Messages() {
                   </label>
                   <input
                     type="text"
-                    value={channelName}
-                    onChange={(e) => setChannelName(e.target.value)}
+                    value={chanName}
+                    onChange={(e) => setChanName(e.target.value)}
                     placeholder="e.g. Vintage Gadgets Elite"
                     className="w-full text-sm bg-zinc-50 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 outline-none focus:ring-2 ring-emerald-500/50 text-zinc-900 dark:text-zinc-100"
                   />
@@ -2307,8 +2449,8 @@ export default function Messages() {
                     <span className="absolute left-4 top-3.5 text-zinc-400 text-sm font-bold">@</span>
                     <input
                       type="text"
-                      value={channelCustomLink}
-                      onChange={(e) => setChannelCustomLink(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                      value={chanLink}
+                      onChange={(e) => setChanLink(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
                       placeholder="vintage_elite"
                       className="w-full text-sm bg-zinc-50 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-800 rounded-xl pl-8 pr-4 py-3 outline-none focus:ring-2 ring-emerald-500/50 text-zinc-900 dark:text-zinc-100 font-semibold"
                     />
@@ -2324,8 +2466,8 @@ export default function Messages() {
                     Channel Description
                   </label>
                   <textarea
-                    value={channelDesc}
-                    onChange={(e) => setChannelDesc(e.target.value)}
+                    value={chanDesc}
+                    onChange={(e) => setChanDesc(e.target.value)}
                     placeholder="Describe your community updates..."
                     rows={3}
                     className="w-full text-sm bg-zinc-50 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 outline-none focus:ring-2 ring-emerald-500/50 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 resize-none"
@@ -2339,8 +2481,8 @@ export default function Messages() {
                   </label>
                   <input
                     type="url"
-                    value={channelImage}
-                    onChange={(e) => setChannelImage(e.target.value)}
+                    value={chanImage}
+                    onChange={(e) => setChanImage(e.target.value)}
                     placeholder="https://images.unsplash.com/photo-..."
                     className="w-full text-sm bg-zinc-50 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 outline-none focus:ring-2 ring-emerald-500/50 text-zinc-900 dark:text-zinc-100"
                   />
@@ -2354,7 +2496,7 @@ export default function Messages() {
                       <button 
                         key={idx}
                         type="button"
-                        onClick={() => setChannelImage(url)}
+                        onClick={() => setChanImage(url)}
                         className="text-[10px] font-bold px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/20"
                       >
                         Preset {idx + 1}
@@ -2433,7 +2575,7 @@ export default function Messages() {
                       {channels.map(ch => (
                         <button
                           key={ch.id}
-                          onClick={() => handleSendForward({ id: ch.id, name: ch.name, isChannelTarget: true })}
+                          onClick={() => handleSendForward(ch, true)}
                           className="w-full flex items-center gap-3 p-2 rounded-xl bg-zinc-50 hover:bg-emerald-50 dark:bg-zinc-800/30 dark:hover:bg-zinc-800 transition text-left"
                         >
                           <img src={ch.imageUrl} alt="Channel img" className="w-8 h-8 rounded-full object-cover border border-zinc-200 dark:border-zinc-700" />
@@ -2456,7 +2598,7 @@ export default function Messages() {
                       {chats.map(c => (
                         <button
                           key={c.id}
-                          onClick={() => handleSendForward({ id: c.id, name: c.otherUser?.shopName || c.otherUser?.displayName || 'Chat Participant', isChannelTarget: false, otherUserId: c.otherUser?.id })}
+                          onClick={() => handleSendForward(c, false)}
                           className="w-full flex items-center gap-3 p-2 rounded-xl bg-zinc-50 hover:bg-emerald-50 dark:bg-zinc-800/30 dark:hover:bg-zinc-800 transition text-left"
                         >
                           <div className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center shrink-0 border border-zinc-200 dark:border-zinc-700 text-xs font-bold text-emerald-700">
