@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Phone, Video, VideoOff, Paperclip, Send, X, PhoneOff, Mic, MicOff, Volume2, Image as ImageIcon, CheckCheck, Clock, ChevronLeft, User, Search, AlertCircle, MessageSquareShare, Star, Sparkles, Plus, Users, Pin, PinOff, VolumeX, Forward, Edit, MoreVertical, Link, Info, Trash } from 'lucide-react';
+import { Phone, Video, VideoOff, Paperclip, Send, X, PhoneOff, Mic, MicOff, Volume2, Image as ImageIcon, CheckCheck, Clock, ChevronLeft, ArrowLeft, User, Search, AlertCircle, MessageSquareShare, Star, Sparkles, Plus, Users, Pin, PinOff, VolumeX, Forward, Edit, MoreVertical, Link, Info, Trash } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { subscribeToWebPush } from '../lib/push';
 import SEO from '../components/SEO';
@@ -243,6 +243,8 @@ export default function Messages() {
   const [editChanImageFile, setEditChanImageFile] = useState<File | null>(null);
   const [editChanImagePreview, setEditChanImagePreview] = useState('');
   const [isUpdatingChannel, setIsUpdatingChannel] = useState(false);
+  const [showUserInfoModal, setShowUserInfoModal] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
 
   const channelIdParam = searchParams.get('channelId');
   const activeChannel = channelIdParam ? channels.find(c => c.id === channelIdParam) : null;
@@ -1419,14 +1421,38 @@ export default function Messages() {
       
       {/* Sidebar: Chat List */}
       <div className={`w-full md:w-[350px] bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 flex flex-col relative ${activeChat || activeChannel ? 'hidden md:flex' : 'flex'}`}>
-         <div className="p-4 pb-2 flex items-center gap-2">
-             <button onClick={() => navigate('/')} className="p-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition" title="Go Back">
-                 <ChevronLeft className="w-5 h-5 text-zinc-600 dark:text-zinc-400" />
-             </button>
-             <div className="relative flex-1">
-                 <input type="text" placeholder={sidebarTab === 'messages' ? "Search chats..." : "Search communities..."} className="w-full bg-zinc-100 dark:bg-zinc-800/50 rounded-xl py-3 pl-10 pr-4 text-sm font-medium outline-none focus:ring-2 ring-emerald-500/50" />
-                 <Search className="absolute left-3.5 top-3.5 w-4 h-4 text-zinc-400" />
+         <div className="p-4 pb-2 flex flex-col gap-4">
+             <div className="flex items-center justify-between">
+                 <div className="flex items-center gap-3">
+                     <button onClick={() => navigate('/')} className="text-zinc-900 dark:text-zinc-100 hover:opacity-70 transition" title="Go Back">
+                         <ChevronLeft className="w-6 h-6" />
+                     </button>
+                     <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">Chat</h1>
+                 </div>
              </div>
+             
+             <div className="relative w-full">
+                 <Search className="absolute left-4 top-3.5 w-4 h-4 text-purple-400" />
+                 <input type="text" placeholder="Search here.." className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 rounded-full py-3 pl-11 pr-11 text-[13px] font-medium outline-none focus:ring-2 ring-purple-500/50 placeholder:text-zinc-400" />
+                 <Mic className="absolute right-4 top-3.5 w-4 h-4 text-zinc-400" />
+             </div>
+         </div>
+
+         {/* Online Users Top Row */}
+         <div className="px-4 py-3 flex items-center gap-5 overflow-x-auto no-scrollbar border-b border-zinc-100 dark:border-zinc-800/50 pb-4">
+             {chats.slice(0, 8).map((chat, idx) => (
+                 <div key={`online-${chat.id}`} className="flex flex-col items-center gap-1.5 shrink-0 cursor-pointer hover:opacity-80 transition" onClick={() => navigate(`/messages?chatId=${chat.id}`)}>
+                     <div className="relative w-14 h-14">
+                         <div className="w-full h-full rounded-full bg-zinc-200 dark:bg-zinc-800 border-2 border-transparent">
+                             <img src={chat.otherUser?.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${chat.otherUser?.id || chat.id}`} alt="User" className="w-full h-full rounded-full object-cover" />
+                         </div>
+                         <div className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white dark:border-zinc-900"></div>
+                     </div>
+                     <span className="text-[11px] font-medium text-zinc-600 dark:text-zinc-400 w-14 truncate text-center">
+                         {chat.otherUser?.displayName?.split(' ')[0] || chat.otherUser?.shopName || 'User'}
+                     </span>
+                 </div>
+             ))}
          </div>
 
          <div className="flex-1 overflow-y-auto">
@@ -1438,47 +1464,56 @@ export default function Messages() {
                          <p className="text-xs mt-1">Start a conversation with a seller to see it here.</p>
                      </div>
                  ) : (
-                     chats.map(chat => {
+                     chats.map((chat, idx) => {
                           const isUnread = chat.lastMessage && chat.lastSenderId !== user.uid && (!chat.seenBy || !chat.seenBy.includes(user.uid));
                           return (
-                         <div 
-                            key={chat.id} 
-                            onClick={() => setSearchParams({ chatId: chat.otherUser?.id || "" })}
-                            className={cn(
-                                 "flex items-center gap-3 p-4 cursor-pointer transition-colors border-b border-zinc-100 dark:border-zinc-800/50 hover:bg-zinc-50 dark:hover:bg-zinc-800/50",
-                                 activeChat?.id === chat.id ? "bg-zinc-50 dark:bg-zinc-800" : ""
-                             )}
-                         >
-                             <div className="w-12 h-12 rounded-full overflow-hidden bg-zinc-200 dark:bg-zinc-800 shrink-0 border border-zinc-200 dark:border-zinc-700">
-                                 {chat.otherUser?.photoURL ? (
-                                     <img src={chat.otherUser.photoURL} alt={chat.otherUser.displayName} className="w-full h-full object-cover" />
-                                 ) : (
-                                     <div className="w-full h-full flex items-center justify-center bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 font-bold text-lg">
-                                         {(chat.otherUser?.displayName || chat.otherUser?.shopName || 'U')[0].toUpperCase()}
-                                     </div>
+                             <div 
+                                key={chat.id} 
+                                onClick={() => setSearchParams({ chatId: chat.otherUser?.id || "" })}
+                                className={cn(
+                                     "flex items-center gap-4 p-4 cursor-pointer transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/50",
+                                     activeChat?.id === chat.id ? "bg-zinc-50 dark:bg-zinc-800" : ""
                                  )}
-                             </div>
-                             <div className="flex-1 min-w-0">
-                                 <div className="flex justify-between items-center mb-0.5">
-                                     <h4 className={cn("text-[15px] truncate", isUnread ? "font-black text-zinc-950 dark:text-white" : "font-bold text-zinc-900 dark:text-zinc-100")}>
-                                         {chat.otherUser?.shopName || chat.otherUser?.displayName || 'Unknown User'}
-                                     </h4>
-                                     {chat.updatedAt && (
-                                         <span className={cn("text-[10px]", isUnread ? "font-extrabold text-emerald-600 dark:text-emerald-400 animate-pulse" : "font-bold text-zinc-400")}>
-                                             {new Date(chat.updatedAt?.toMillis ? chat.updatedAt.toMillis() : Date.now()).toLocaleDateString([], { month: 'short', day: 'numeric' })}
-                                         </span>
+                             >
+                                 <div className="relative shrink-0">
+                                     <div className="w-12 h-12 rounded-full overflow-hidden bg-zinc-200 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
+                                         {chat.otherUser?.photoURL ? (
+                                             <img src={chat.otherUser.photoURL} alt={chat.otherUser.displayName} className="w-full h-full object-cover" />
+                                         ) : (
+                                             <div className="w-full h-full flex items-center justify-center bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 font-bold text-lg">
+                                                 {(chat.otherUser?.displayName || chat.otherUser?.shopName || 'U')[0].toUpperCase()}
+                                             </div>
+                                         )}
+                                     </div>
+                                     {/* Active Dot (Mock) */}
+                                     {idx % 3 === 0 && (
+                                         <div className="absolute bottom-0.5 right-0 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white dark:border-zinc-900"></div>
                                      )}
                                  </div>
-                                 <div className="flex justify-between items-center gap-2">
-                                      <p className={cn("text-[13px] truncate flex-1", isUnread ? "font-extrabold text-zinc-950 dark:text-white" : "text-zinc-500 dark:text-zinc-400")}>{chat.lastMessage}</p>
-                                      {isUnread && (
-                                          <span className="bg-emerald-500 text-white text-[9px] font-black w-5 h-5 flex items-center justify-center rounded-full animate-pulse shrink-0">
-                                              1
-                                          </span>
-                                      )}
-                                  </div>
+                                 
+                                 <div className="flex-1 min-w-0">
+                                     <div className="flex justify-between items-center mb-1">
+                                         <div className="flex items-center gap-2">
+                                             <h4 className="text-[15px] font-bold text-zinc-900 dark:text-zinc-100 truncate">
+                                                 {chat.otherUser?.shopName || chat.otherUser?.displayName || 'Unknown User'}
+                                             </h4>
+                                             {isUnread && (
+                                                 <span className="bg-purple-600 text-white text-[10px] font-bold px-1.5 py-0.5 min-w-[18px] text-center rounded-full">
+                                                     2
+                                                 </span>
+                                             )}
+                                         </div>
+                                         {chat.updatedAt && (
+                                             <span className="text-[11px] font-medium text-zinc-400 shrink-0">
+                                                 {new Date(chat.updatedAt?.toMillis ? chat.updatedAt.toMillis() : Date.now()).toLocaleDateString([], { month: 'short', day: '2-digit' })}
+                                             </span>
+                                         )}
+                                     </div>
+                                     <p className={cn("text-[13px] truncate", isUnread ? "font-semibold text-zinc-800 dark:text-zinc-200" : "text-zinc-400")}>
+                                         {chat.lastMessage}
+                                     </p>
+                                 </div>
                              </div>
-                         </div>
                       )})
                  )
              ) : (
@@ -1586,10 +1621,93 @@ export default function Messages() {
       {/* Main Chat Area */}
       <div className={`flex-1 bg-[#F0F2F5] dark:bg-[#0a0a0a] flex-col ${(!activeChat && !activeChannel) ? 'hidden md:flex' : 'flex'}`}>
          {activeChannel ? (
-             <>
-                  {/* Active Community Channel Header */}
-                  <div className="bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 px-4 sm:px-6 py-3 flex items-center justify-between shrink-0 z-10 shadow-sm">
-                      <div className="flex items-center gap-3 min-w-0 cursor-pointer" onClick={() => setShowChannelDetailsModal(true)}>
+             showChannelDetailsModal ? (
+                 <div className="flex-1 flex flex-col bg-white dark:bg-zinc-950 overflow-y-auto no-scrollbar font-inter">
+                     {/* Back Header */}
+                     <div className="sticky top-0 z-10 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md px-4 py-3 flex items-center gap-3 border-b border-zinc-200 dark:border-zinc-800">
+                         <button 
+                             onClick={() => setShowChannelDetailsModal(false)}
+                             className="p-1.5 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-900 dark:text-zinc-100 transition"
+                         >
+                             <ArrowLeft className="w-6 h-6" />
+                         </button>
+                         <h2 className="text-lg font-bold">Channel Profile</h2>
+                     </div>
+
+                     <div className="p-4 sm:p-6 max-w-2xl mx-auto w-full">
+                         {/* Cover Banner Image */}
+                         <div className="h-48 sm:h-64 w-full relative rounded-3xl overflow-hidden mb-6 border border-zinc-200 dark:border-zinc-800 shadow-sm">
+                           <img src={activeChannel.imageUrl} alt="Channel cover" className="w-full h-full object-cover" />
+                           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-5">
+                             <span className="text-[11px] font-black tracking-widest text-emerald-400 uppercase">Verified Community</span>
+                             <h3 className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-1">{activeChannel.name}</h3>
+                             <p className="text-sm text-white/80 font-bold mt-0.5">@{activeChannel.customLink}</p>
+                           </div>
+                         </div>
+
+                         {/* Description */}
+                         <div className="mb-6">
+                           <h5 className="text-[11px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-2">Description</h5>
+                           <p className="text-sm text-zinc-800 dark:text-zinc-200 leading-relaxed bg-zinc-50 dark:bg-zinc-900 p-4 rounded-2xl border border-zinc-100 dark:border-zinc-800">
+                             {activeChannel.description || "Welcome to our exclusive product broadcast channel. Join for periodic updates, visual arrivals, and direct chat links!"}
+                           </p>
+                         </div>
+
+                         {/* Stats */}
+                         <div className="grid grid-cols-2 gap-4 mb-8">
+                           <div className="p-4 bg-zinc-50 dark:bg-zinc-900 rounded-2xl text-center border border-zinc-100 dark:border-zinc-800">
+                             <p className="text-[11px] font-bold text-zinc-400 dark:text-zinc-500 uppercase">Subscribers</p>
+                             <p className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">{activeChannel.subscriberCount || 1}</p>
+                           </div>
+                           <div className="p-4 bg-zinc-50 dark:bg-zinc-900 rounded-2xl text-center border border-zinc-100 dark:border-zinc-800">
+                             <p className="text-[11px] font-bold text-zinc-400 dark:text-zinc-500 uppercase">Creator</p>
+                             <p className="text-sm sm:text-base font-black text-[#EF8020] truncate mt-1.5">{activeChannel.creatorName || "Verified Seller"}</p>
+                           </div>
+                         </div>
+
+                         {/* Unsubscribe / Mute / Action Buttons */}
+                         <div className="space-y-3">
+                           {userSubscription ? (
+                             <>
+                               <button
+                                 type="button"
+                                 onClick={() => handleToggleMuteChannel(activeChannel, userSubscription.muted)}
+                                 className="w-full py-4 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-900 dark:text-white rounded-2xl font-bold text-sm transition flex items-center justify-center gap-2"
+                               >
+                                 {userSubscription.muted ? <Volume2 className="w-5 h-5 text-emerald-500" /> : <VolumeX className="w-5 h-5 text-rose-500" />}
+                                 <span>{userSubscription.muted ? "Unmute Channel Broadcasts" : "Mute Notifications"}</span>
+                               </button>
+
+                               <button
+                                 type="button"
+                                 onClick={() => {
+                                   handleUnsubscribeFromChannel(activeChannel);
+                                 }}
+                                 className="w-full py-4 bg-rose-50 hover:bg-rose-100 text-rose-600 dark:bg-rose-950/20 dark:hover:bg-rose-950/40 dark:text-rose-400 rounded-2xl font-bold text-sm transition flex items-center justify-center gap-2"
+                               >
+                                 <X className="w-5 h-5" />
+                                 <span>Unsubscribe from Community</span>
+                               </button>
+                             </>
+                           ) : (
+                             <button
+                               type="button"
+                               onClick={() => {
+                                 handleSubscribeToChannel(activeChannel);
+                               }}
+                               className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-bold text-sm transition flex items-center justify-center gap-2 shadow-md"
+                             >
+                               <Plus className="w-5 h-5" />
+                               <span>Join Community</span>
+                             </button>
+                           )}
+                         </div>
+                     </div>
+                 </div>
+             ) : (
+                 <>
+                      {/* Active Community Channel Header */}
+                      <div className="bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 px-4 sm:px-6 py-3 flex items-center justify-between shrink-0 z-10 shadow-sm cursor-pointer" onClick={() => setShowChannelDetailsModal(true)}>
                           <button 
                             type="button"
                             onClick={(e) => { e.stopPropagation(); setSearchParams({}); }} 
@@ -1651,7 +1769,6 @@ export default function Messages() {
                               <Info className="w-4.5 h-4.5" />
                           </button>
                       </div>
-                  </div>
 
                   {activeChannel.pinnedMessage && (
                     <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-zinc-900/90 dark:to-zinc-950/90 border-b border-amber-100 dark:border-zinc-800 px-4 py-2 flex items-center justify-between text-xs shrink-0 z-10 shadow-sm relative">
@@ -1700,7 +1817,7 @@ export default function Messages() {
                                   <div 
                                     key={msg.id} 
                                     id={`msg-${msg.id}`}
-                                    className="flex gap-2 justify-start relative pb-3"
+                                    className="flex gap-2 justify-start relative pb-3 group"
                                     onClick={() => setActiveMessageMenuId(null)}
                                   >
                                       {/* Seller Avatar */}
@@ -1714,7 +1831,7 @@ export default function Messages() {
                                           )}
                                       </div>
                                                                    
-                                      <div className="max-w-[75%] items-start flex flex-col relative">
+                                      <div className="max-w-[75%] items-start flex flex-col relative group/bubble">
                                           {/* Sender Label and Badge */}
                                           <div className="flex items-center gap-1.5 mb-1 ml-1">
                                               <span className="font-extrabold text-[11px] text-[#EF8020]">
@@ -1756,14 +1873,20 @@ export default function Messages() {
                                           {msg.text && (
                                               <div 
                                                   onClick={(e) => { e.stopPropagation(); setActiveMessageMenuId(isMenuOpen ? null : msg.id); }}
-                                                  className="px-4 py-2.5 rounded-2xl shadow-sm cursor-pointer select-none relative bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 rounded-bl-sm border border-zinc-200 dark:border-zinc-800"
+                                                  className="px-3 py-1.5 rounded-[18px] shadow-sm cursor-pointer select-none relative bg-white dark:bg-[#181818] text-black dark:text-white rounded-bl-none border border-zinc-100 dark:border-zinc-800/50 flex flex-col"
                                               >
-                                                  <p className="text-[14px] leading-relaxed whitespace-pre-wrap break-words">
+                                                  <p className="text-[15px] leading-relaxed whitespace-pre-wrap break-words pr-12">
                                                       {renderTextWithLinks(msg.text, false)}
                                                   </p>
                                                   
                                                   {/* URL Preview support */}
                                                   <LinkPreviewCard text={msg.text} />
+                                                  
+                                                  <div className="absolute bottom-1 right-2 flex items-center gap-1">
+                                                      <span className="text-[10px] font-medium text-zinc-400">
+                                                          {formatTime12h(msg.timestamp)}
+                                                      </span>
+                                                  </div>
                                               </div>
                                           )}
 
@@ -1922,12 +2045,30 @@ export default function Messages() {
                               </button>
                           </div>
                       ) : (
-                          <div className="text-center py-2.5 bg-zinc-50 dark:bg-zinc-800/50 text-xs font-bold text-zinc-500 dark:text-zinc-400 rounded-xl">
-                               📢 Only verified sellers can post updates in this community.
+                          <div className="flex justify-center w-full">
+                              {userSubscription ? (
+                                  <button
+                                      type="button"
+                                      onClick={() => handleToggleMuteChannel(activeChannel, userSubscription.muted)}
+                                      className="w-full max-w-sm py-3 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white rounded-2xl font-bold text-sm transition flex items-center justify-center gap-2"
+                                  >
+                                      {userSubscription.muted ? <Volume2 className="w-5 h-5 text-emerald-500" /> : <VolumeX className="w-5 h-5 text-zinc-500" />}
+                                      <span>{userSubscription.muted ? "Unmute" : "Mute"}</span>
+                                  </button>
+                              ) : (
+                                  <button
+                                      type="button"
+                                      onClick={() => handleSubscribeToChannel(activeChannel)}
+                                      className="w-full max-w-sm py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-bold text-sm transition flex items-center justify-center gap-2 shadow-md"
+                                  >
+                                      <span>Join</span>
+                                  </button>
+                              )}
                           </div>
                       )}
-                  </div>
-             </>
+                    </div>
+                 </>
+             )
          ) : !activeChat ? (
              <div className="flex-1 flex flex-col items-center justify-center text-zinc-400">
                  <div className="w-20 h-20 rounded-full bg-white dark:bg-zinc-900 shadow-sm flex items-center justify-center mb-4">
@@ -1941,46 +2082,58 @@ export default function Messages() {
          ) : (
              <>
                  {/* Active Chat Header */}
-                 <div className="bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 px-4 sm:px-6 py-3 flex items-center justify-between shrink-0 z-10 shadow-sm">
-                     <div className="flex items-center gap-3 min-w-0">
+                 <div className="bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 px-4 sm:px-6 py-4 flex items-center justify-between shrink-0 z-10 shadow-sm">
+                     <div className="flex items-center gap-4 min-w-0">
                          <button 
                            type="button"
                            onClick={() => setSearchParams({})} 
-                           className="md:hidden p-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition shrink-0"
+                           className="md:hidden p-1 transition shrink-0"
                            title="Back to Chats"
                          >
-                             <ChevronLeft className="w-5 h-5 text-zinc-600 dark:text-zinc-400" />
+                             <ArrowLeft className="w-6 h-6 text-zinc-900 dark:text-zinc-100" />
+                         </button>
+                         <button 
+                           type="button"
+                           onClick={() => setSearchParams({})} 
+                           className="hidden md:block p-1 transition shrink-0 hover:opacity-70"
+                           title="Back to Chats"
+                         >
+                             <ArrowLeft className="w-5 h-5 text-zinc-900 dark:text-zinc-100" />
                          </button>
                          
-                         <div className="w-10 h-10 rounded-full overflow-hidden bg-zinc-200 dark:bg-zinc-800 shrink-0 border border-zinc-200 dark:border-zinc-700">
-                             {activeChat.otherUser?.photoURL ? (
-                                 <img src={activeChat.otherUser.photoURL} alt={activeChat.otherUser.displayName} className="w-full h-full object-cover" />
-                             ) : (
-                                 <div className="w-full h-full flex items-center justify-center bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 font-bold text-sm">
-                                     {(activeChat.otherUser?.displayName || activeChat.otherUser?.shopName || 'U')[0].toUpperCase()}
-                                 </div>
-                             )}
+                         <div className="relative w-11 h-11 shrink-0">
+                             <div className="w-full h-full rounded-full overflow-hidden bg-zinc-200 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
+                                 {activeChat.otherUser?.photoURL ? (
+                                     <img src={activeChat.otherUser.photoURL} alt={activeChat.otherUser.displayName} className="w-full h-full object-cover" />
+                                 ) : (
+                                     <div className="w-full h-full flex items-center justify-center bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 font-bold text-sm">
+                                         {(activeChat.otherUser?.displayName || activeChat.otherUser?.shopName || 'U')[0].toUpperCase()}
+                                     </div>
+                                 )}
+                             </div>
+                             {/* Active dot overlay */}
+                             <div className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-pink-500 border-2 border-white dark:border-zinc-900"></div>
                          </div>
                          
                          <div className="min-w-0">
-                             <h3 className="font-bold text-[15px] text-zinc-900 dark:text-zinc-100 truncate">
+                             <h3 className="font-bold text-[16px] text-zinc-900 dark:text-zinc-100 truncate cursor-pointer hover:underline" onClick={() => setShowUserInfoModal(true)}>
                                  {activeChat.otherUser?.shopName || activeChat.otherUser?.displayName || 'Unknown User'}
                              </h3>
-                             <p className={cn("text-[10px] font-bold flex items-center gap-1", otherUserPresence?.isOnline ? "text-emerald-500" : "text-zinc-500")}>
-                                 <span className={cn("w-1.5 h-1.5 rounded-full", otherUserPresence?.isOnline ? "bg-emerald-500 animate-pulse" : "bg-zinc-400/80")}></span>
-                                 {getLastActiveText(otherUserPresence)}
+                             <p className="text-[12px] font-medium flex items-center gap-1 text-zinc-400 mt-0.5">
+                                 Active Now
+                                 <span className="w-1.5 h-1.5 rounded-full bg-pink-500 ml-1"></span>
                              </p>
                          </div>
                      </div>
 
-                     <div className="flex items-center gap-1.5 shrink-0">
+                     <div className="flex items-center gap-2 shrink-0">
                          <button 
                            type="button"
                            onClick={() => startCall('audio')} 
-                           className="p-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 hover:text-emerald-600 dark:hover:text-emerald-400 rounded-xl transition" 
+                           className="p-2 text-zinc-600 dark:text-zinc-300 hover:opacity-70 transition" 
                            title="Voice Call"
                          >
-                             <Phone className="w-4.5 h-4.5" />
+                             <Phone className="w-5 h-5" />
                          </button>
                      </div>
                  </div>
@@ -2009,7 +2162,7 @@ export default function Messages() {
                          }
 
                          return (
-                             <div key={msg.id} className={`flex gap-2 ${isMe ? 'justify-end' : 'justify-start'} relative pb-3`} onClick={() => setActiveMessageMenuId(null)}>
+                             <div key={msg.id} id={`msg-${msg.id}`} className={`flex gap-2 ${isMe ? 'justify-end' : 'justify-start'} relative pb-3 group`} onClick={() => setActiveMessageMenuId(null)}>
                                  {!isMe && (
                                      <div className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-800 shrink-0 self-end overflow-hidden mb-1">
                                          {showAvatar && (
@@ -2023,52 +2176,6 @@ export default function Messages() {
                                  )}
                                  
                                  <div className={`max-w-[75%] ${isMe ? 'items-end' : 'items-start'} flex flex-col relative`}>
-                                     {/* Reaction / Reply floating menu */}
-                                     {isMenuOpen && (
-                                         <motion.div 
-                                             initial={{ opacity: 0, scale: 0.95, y: 5 }} 
-                                             animate={{ opacity: 1, scale: 1, y: 0 }} 
-                                             className={`absolute z-50 ${isMe ? 'right-0' : 'left-0'} -top-12 flex items-center gap-1.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 shadow-xl rounded-full px-3 py-1.5`}
-                                             onClick={(e) => e.stopPropagation()}
-                                         >
-                                             {['👍', '❤️', '😂', '😢', '😡', '🥰'].map(emoji => (
-                                                 <button 
-                                                     key={emoji} 
-                                                     onClick={(e) => { e.stopPropagation(); handleReactToMessage(msg.id, emoji); }} 
-                                                     className="hover:scale-125 transition-transform text-base duration-150"
-                                                 >
-                                                     {emoji}
-                                                 </button>
-                                             ))}
-                                             <div className="w-px h-5 bg-zinc-200 dark:bg-zinc-700 mx-1"></div>
-                                             <button 
-                                                 onClick={(e) => {
-                                                     e.stopPropagation();
-                                                     setReplyingTo({ id: msg.id, text: msg.text || "Image attachment", senderId: msg.senderId });
-                                                     setActiveMessageMenuId(null);
-                                                 }}
-                                                 className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider px-2 py-0.5 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-md"
-                                             >
-                                                 Reply
-                                             </button>
-                                             <button 
-                                                 onClick={(e) => {
-                                                     e.stopPropagation();
-                                                     setForwardingMessage({
-                                                        text: msg.text || "",
-                                                        imageUrl: msg.imageUrl || "",
-                                                        originalSenderName: msg.senderId === user.uid ? "You" : (activeChat.otherUser?.shopName || activeChat.otherUser?.displayName || "User")
-                                                     });
-                                                     setShowForwardModal(true);
-                                                     setActiveMessageMenuId(null);
-                                                 }}
-                                                 className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider px-2 py-0.5 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-md"
-                                             >
-                                                 Forward
-                                             </button>
-                                         </motion.div>
-                                     )}
-
                                      {/* Forwarded Header (if any) */}
                                      {msg.forwardedFrom && (
                                        <div className={`flex items-center gap-1 text-[10px] ${isMe ? 'text-emerald-200' : 'text-zinc-400 dark:text-zinc-500'} font-bold mb-1 italic`}>
@@ -2099,7 +2206,7 @@ export default function Messages() {
                                      {msg.text && (
                                          <div 
                                              onClick={(e) => { e.stopPropagation(); setActiveMessageMenuId(isMenuOpen ? null : msg.id); }}
-                                             className={`px-4 py-2.5 rounded-2xl shadow-sm cursor-pointer select-none relative ${isMe ? 'bg-emerald-600 text-white rounded-br-sm' : 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 rounded-bl-sm border border-zinc-200 dark:border-zinc-800'}`}
+                                             className={`px-4 py-2.5 rounded-2xl shadow-sm cursor-pointer select-none relative ${isMe ? 'bg-[#e6c1e3] text-zinc-900 rounded-br-sm' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 rounded-bl-sm'}`}
                                          >
                                              <p className="text-[14px] leading-relaxed whitespace-pre-wrap break-words">
                                                  {renderTextWithLinks(msg.text, isMe)}
@@ -2108,17 +2215,26 @@ export default function Messages() {
                                          </div>
                                      )}
 
-                                     {/* Reactions Badge */}
-                                     {reactionEntries.length > 0 && (
-                                         <div className={`absolute -bottom-2 ${isMe ? 'right-2' : 'left-2'} flex gap-1 bg-white dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 shadow-md rounded-full px-1.5 py-0.5 text-[11px] select-none z-10`}>
-                                             {Array.from(new Set(reactionEntries.map(([uid, emoji]) => emoji))).map((emoji: any) => (
-                                                 <span key={emoji}>{emoji}</span>
-                                             ))}
-                                             {reactionEntries.length > 1 && (
-                                                 <span className="text-[9px] font-bold text-zinc-500 dark:text-zinc-400 self-center ml-0.5">{reactionEntries.length}</span>
-                                             )}
-                                         </div>
-                                     )}
+                                     {/* Reactions Badge / Add Reaction */}
+                                     <div 
+                                         className={`absolute -bottom-2 ${isMe ? 'right-2' : 'right-2'} flex items-center gap-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 shadow-sm rounded-full px-2 py-0.5 z-10 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition cursor-pointer ${reactionEntries.length > 0 ? 'opacity-100 scale-100' : 'opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100'}`} 
+                                         onClick={(e) => { e.stopPropagation(); setActiveMessageMenuId(msg.id); }}
+                                     >
+                                         {reactionEntries.length > 0 ? (
+                                             <>
+                                                 {Array.from(new Set(reactionEntries.map(([uid, emoji]) => emoji))).map((emoji: any) => (
+                                                     <span key={emoji} className="text-[12px]">{emoji}</span>
+                                                 ))}
+                                                 {reactionEntries.length > 1 && (
+                                                     <span className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 self-center ml-0.5">{reactionEntries.length}</span>
+                                                 )}
+                                             </>
+                                         ) : (
+                                             <div className="flex items-center text-zinc-400 py-[2px]">
+                                                <Plus className="w-3 h-3" />
+                                             </div>
+                                         )}
+                                     </div>
 
                                      <span className="text-[9px] font-semibold text-zinc-400 mt-1 mx-1">
                                          {formatTime12h(msg.timestamp)}</span>{isMe && idx === messages.length - 1 && <div className="text-[9.5px] font-bold text-emerald-600 dark:text-emerald-400 mt-0.5 uppercase tracking-wide select-none">{activeChat.seenBy && activeChat.seenBy.includes(activeChat.otherUser.id) ? "Seen" : (otherUserPresence?.isOnline ? "Delivered" : "Sent")}</div>}<span className="hidden">
@@ -2197,14 +2313,12 @@ export default function Messages() {
                          )}
                      </AnimatePresence>
                      
-                     <div className="flex items-end gap-2 bg-zinc-100 dark:bg-zinc-800/50 p-1.5 sm:p-2 rounded-[24px] border border-zinc-200 dark:border-zinc-700 focus-within:border-emerald-500/50 focus-within:ring-2 ring-emerald-500/20 transition-all">
+                     <div className="flex items-center gap-2 bg-zinc-100 dark:bg-zinc-800/80 px-2 py-1.5 rounded-full border border-zinc-200 dark:border-zinc-700">
                          <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" accept="image/*" />
                          
-                         <button onClick={() => fileInputRef.current?.click()} className="p-3 text-zinc-400 hover:text-emerald-500 hover:bg-white dark:hover:bg-zinc-800 rounded-full transition-colors shrink-0" title="Attach Image">
+                         <button onClick={() => fileInputRef.current?.click()} className="p-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 transition-colors shrink-0" title="Attach Image">
                              <Paperclip className="w-5 h-5" />
                          </button>
-                         
-                         
                          
                          <textarea
                              value={newMessage}
@@ -2216,16 +2330,16 @@ export default function Messages() {
                                  }
                              }}
                              placeholder={`Message ${activeChat?.otherUser?.shopName || activeChat?.otherUser?.displayName || 'Seller'}...`}
-                             className="flex-1 max-h-32 min-h-[44px] bg-transparent border-none focus:ring-0 resize-none py-3 px-2 text-[15px] text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 placeholder:font-medium leading-tight"
+                             className="flex-1 bg-transparent border-none focus:ring-0 resize-none py-2 text-[15px] text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 placeholder:font-medium leading-tight h-[40px]"
                              rows={1}
                          />
                          
                          <button 
                              onClick={handleSendMessage}
                              disabled={!newMessage.trim() && !attachment}
-                             className={`p-3 rounded-full shrink-0 transition-all ${(newMessage.trim() || attachment) ? 'bg-emerald-600 text-white shadow-md hover:bg-emerald-500 active:scale-95' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-400'}`}
+                             className={`p-2 shrink-0 transition-all ${(newMessage.trim() || attachment) ? 'text-emerald-600 dark:text-emerald-400 active:scale-95' : 'text-zinc-400'}`}
                          >
-                             <Send className="w-5 h-5 ml-0.5" />
+                             {newMessage.trim() || attachment ? <Send className="w-5 h-5" /> : <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>}
                          </button>
                      </div>
                  </div>
@@ -2243,6 +2357,9 @@ export default function Messages() {
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
             className="fixed inset-0 z-[9999] bg-zinc-900 flex flex-col font-inter"
           >
+            <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
+            <video ref={localVideoRef} autoPlay playsInline muted className="hidden" />
+            <video ref={remoteVideoRef} autoPlay playsInline className="hidden" />
             {/* Background elements */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
                <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120vw] h-[120vw] bg-emerald-500/10 rounded-full blur-3xl" />
@@ -2305,6 +2422,85 @@ export default function Messages() {
                 </div>
             </div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Active Message Menu Modal */}
+      <AnimatePresence>
+        {activeMessageMenuId && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-white/20 dark:bg-black/20 backdrop-blur-md"
+              onClick={() => setActiveMessageMenuId(null)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="relative z-10 w-full max-w-sm bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-2xl rounded-3xl overflow-hidden font-inter"
+            >
+              <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+                {['😂', '🫶', '😍', '🥶', '😭'].map(emoji => (
+                    <button 
+                        key={emoji} 
+                        onClick={() => { handleReactToMessage(activeMessageMenuId, emoji); setActiveMessageMenuId(null); }} 
+                        className="hover:scale-125 transition-transform text-3xl duration-150"
+                    >
+                        {emoji}
+                    </button>
+                ))}
+                <button className="w-10 h-10 bg-zinc-100 dark:bg-zinc-800 rounded-full flex items-center justify-center text-zinc-500 font-bold hover:bg-zinc-200 dark:hover:bg-zinc-700 transition">
+                    <Plus className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="flex flex-col p-2">
+                  <button 
+                      onClick={() => {
+                          const msg = messages.find(m => m.id === activeMessageMenuId);
+                          if (msg) setReplyingTo({ id: msg.id, text: msg.text || "Image attachment", senderId: msg.senderId });
+                          setActiveMessageMenuId(null);
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 rounded-2xl transition text-zinc-800 dark:text-zinc-200 font-semibold text-[15px]"
+                  >
+                      <svg className="w-5 h-5 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                      </svg>
+                      Reply
+                  </button>
+                  <button 
+                      onClick={() => {
+                          const msg = messages.find(m => m.id === activeMessageMenuId);
+                          if (msg) {
+                              setForwardingMessage({
+                                 text: msg.text || "",
+                                 imageUrl: msg.imageUrl || "",
+                                 originalSenderName: msg.senderId === user?.uid ? "You" : (activeChat?.otherUser?.shopName || activeChat?.otherUser?.displayName || "User")
+                              });
+                              setShowForwardModal(true);
+                          }
+                          setActiveMessageMenuId(null);
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 rounded-2xl transition text-zinc-800 dark:text-zinc-200 font-semibold text-[15px]"
+                  >
+                      <Forward className="w-5 h-5 text-zinc-500" />
+                      Forward
+                  </button>
+                  <button 
+                      onClick={() => {
+                          setActiveMessageMenuId(null);
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 rounded-2xl transition text-rose-600 dark:text-rose-500 font-semibold text-[15px]"
+                  >
+                      <AlertCircle className="w-5 h-5" />
+                      Report
+                  </button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
 
@@ -2529,6 +2725,90 @@ export default function Messages() {
       </AnimatePresence>
 
       {/* --- Forward Message Modal --- */}
+      {/* User Info Modal */}
+      <AnimatePresence>
+        {showUserInfoModal && activeChat && (
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white dark:bg-zinc-900 w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl font-inter flex flex-col relative"
+            >
+              <div className="p-4 flex items-center justify-between">
+                <button onClick={() => setShowUserInfoModal(false)} className="p-2 -ml-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 transition">
+                  <ArrowLeft className="w-6 h-6 text-zinc-900 dark:text-white" />
+                </button>
+                <div className="relative">
+                  <button onClick={() => setShowUserMenu(!showUserMenu)} className="p-2 -mr-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 transition">
+                    <MoreVertical className="w-6 h-6 text-zinc-900 dark:text-white" />
+                  </button>
+                  <AnimatePresence>
+                    {showUserMenu && (
+                      <motion.div 
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-zinc-800 rounded-xl shadow-lg border border-zinc-200 dark:border-zinc-700 py-2 z-50"
+                      >
+                        <button className="w-full text-left px-4 py-2 text-sm text-zinc-900 dark:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-700 flex items-center justify-between">
+                          <span>Auto-Delete</span>
+                          <ChevronLeft className="w-4 h-4 rotate-180" />
+                        </button>
+                        <button className="w-full text-left px-4 py-2 text-sm text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 flex items-center gap-2">
+                          <AlertCircle className="w-4 h-4" />
+                          Block user
+                        </button>
+                        <button className="w-full text-left px-4 py-2 text-sm text-zinc-900 dark:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-700 flex items-center gap-2">
+                          <PinOff className="w-4 h-4" />
+                          Disable Sharing
+                        </button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </div>
+              <div className="flex flex-col items-center pt-2 pb-6 px-6 border-b border-zinc-100 dark:border-zinc-800">
+                <div className="w-24 h-24 rounded-full overflow-hidden bg-zinc-200 dark:bg-zinc-800 mb-4 border border-zinc-200 dark:border-zinc-700">
+                  {activeChat.otherUser?.photoURL ? (
+                    <img src={activeChat.otherUser.photoURL} alt="Avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-3xl font-bold text-emerald-600 bg-emerald-100 dark:bg-emerald-900/30">
+                      {(activeChat.otherUser?.displayName || activeChat.otherUser?.shopName || 'U')[0].toUpperCase()}
+                    </div>
+                  )}
+                </div>
+                <h2 className="text-xl font-bold text-zinc-900 dark:text-white">
+                  {activeChat.otherUser?.shopName || activeChat.otherUser?.displayName || 'Unknown User'}
+                </h2>
+                <p className="text-sm text-zinc-500 mt-1">last seen recently</p>
+                
+                <div className="flex items-center gap-3 mt-6 w-full px-4">
+                  <button onClick={() => setShowUserInfoModal(false)} className="flex-1 flex flex-col items-center justify-center py-2.5 bg-zinc-100 dark:bg-zinc-800 rounded-2xl hover:bg-zinc-200 dark:hover:bg-zinc-700 transition">
+                    <MessageSquareShare className="w-5 h-5 text-zinc-900 dark:text-white mb-1.5" />
+                    <span className="text-[11px] font-bold text-zinc-900 dark:text-white">Message</span>
+                  </button>
+                  <button className="flex-1 flex flex-col items-center justify-center py-2.5 bg-zinc-100 dark:bg-zinc-800 rounded-2xl hover:bg-zinc-200 dark:hover:bg-zinc-700 transition">
+                    <VolumeX className="w-5 h-5 text-zinc-900 dark:text-white mb-1.5" />
+                    <span className="text-[11px] font-bold text-zinc-900 dark:text-white">Mute</span>
+                  </button>
+                  <button onClick={() => { setShowUserInfoModal(false); startCall('audio'); }} className="flex-1 flex flex-col items-center justify-center py-2.5 bg-zinc-100 dark:bg-zinc-800 rounded-2xl hover:bg-zinc-200 dark:hover:bg-zinc-700 transition">
+                    <Phone className="w-5 h-5 text-zinc-900 dark:text-white mb-1.5" />
+                    <span className="text-[11px] font-bold text-zinc-900 dark:text-white">Call</span>
+                  </button>
+                </div>
+              </div>
+              <div className="p-4 bg-zinc-50 dark:bg-[#1C1C1D]">
+                <div className="bg-white dark:bg-zinc-900 rounded-2xl p-4 shadow-sm border border-zinc-100 dark:border-zinc-800">
+                  <p className="text-base text-zinc-900 dark:text-zinc-100">{activeChat.otherUser?.email || "Unknown"}</p>
+                  <p className="text-xs text-zinc-500 mt-0.5">{activeChat.otherUser?.email ? "Email" : "Mobile"}</p>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       <AnimatePresence>
         {showForwardModal && forwardingMessage && (
           <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -2618,98 +2898,6 @@ export default function Messages() {
                       ))}
                     </div>
                   </div>
-                )}
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* --- Community Channel Details Modal --- */}
-      <AnimatePresence>
-        {showChannelDetailsModal && activeChannel && (
-          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 w-full max-w-md shadow-2xl relative overflow-hidden font-inter"
-            >
-              <button 
-                type="button"
-                onClick={() => setShowChannelDetailsModal(false)}
-                className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 transition z-10"
-              >
-                <X className="w-5 h-5 text-white bg-black/30 backdrop-blur-sm p-1 rounded-full" />
-              </button>
-
-              {/* Cover Banner Image */}
-              <div className="h-44 w-full relative rounded-2xl overflow-hidden mb-5 border border-zinc-200 dark:border-zinc-800 shadow-sm">
-                <img src={activeChannel.imageUrl} alt="Channel cover" className="w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-4">
-                  <span className="text-[10px] font-black tracking-widest text-emerald-400 uppercase">Verified Community</span>
-                  <h3 className="text-xl font-black text-white tracking-tight mt-0.5">{activeChannel.name}</h3>
-                  <p className="text-xs text-white/80 font-bold">@{activeChannel.customLink}</p>
-                </div>
-              </div>
-
-              {/* Description */}
-              <div className="mb-5">
-                <h5 className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-1.5">Description</h5>
-                <p className="text-xs text-zinc-700 dark:text-zinc-300 leading-relaxed bg-zinc-50 dark:bg-zinc-800/40 p-3 rounded-xl border border-zinc-100 dark:border-zinc-850">
-                  {activeChannel.description || "Welcome to our exclusive product broadcast channel. Join for periodic updates, visual arrivals, and direct chat links!"}
-                </p>
-              </div>
-
-              {/* Stats */}
-              <div className="grid grid-cols-2 gap-3 mb-5">
-                <div className="p-3 bg-zinc-50 dark:bg-zinc-800/40 rounded-xl text-center border border-zinc-100 dark:border-zinc-850">
-                  <p className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase">Subscribers</p>
-                  <p className="text-lg font-black text-emerald-600 dark:text-emerald-400 mt-1">{activeChannel.subscriberCount || 1}</p>
-                </div>
-                <div className="p-3 bg-zinc-50 dark:bg-zinc-800/40 rounded-xl text-center border border-zinc-100 dark:border-zinc-850">
-                  <p className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase">Creator</p>
-                  <p className="text-xs font-black text-[#EF8020] truncate mt-1.5">{activeChannel.creatorName || "Verified Seller"}</p>
-                </div>
-              </div>
-
-              {/* Unsubscribe / Mute / Action Buttons */}
-              <div className="space-y-2">
-                {userSubscription ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => handleToggleMuteChannel(activeChannel, userSubscription.muted)}
-                      className="w-full py-3 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white rounded-2xl font-bold text-xs transition flex items-center justify-center gap-2"
-                    >
-                      {userSubscription.muted ? <Volume2 className="w-4 h-4 text-emerald-500" /> : <VolumeX className="w-4 h-4 text-rose-500" />}
-                      <span>{userSubscription.muted ? "Unmute Channel Broadcasts" : "Mute Notifications"}</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        handleUnsubscribeFromChannel(activeChannel);
-                        setShowChannelDetailsModal(false);
-                      }}
-                      className="w-full py-3 bg-rose-50 hover:bg-rose-100 text-rose-600 dark:bg-rose-950/20 dark:hover:bg-rose-950/40 dark:text-rose-400 rounded-2xl font-bold text-xs transition flex items-center justify-center gap-2"
-                    >
-                      <X className="w-4 h-4" />
-                      <span>Unsubscribe from Community</span>
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      handleSubscribeToChannel(activeChannel);
-                      setShowChannelDetailsModal(false);
-                    }}
-                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-bold text-xs transition flex items-center justify-center gap-2 shadow-md"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Subscribe to Channel</span>
-                  </button>
                 )}
               </div>
             </motion.div>

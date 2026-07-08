@@ -18,7 +18,7 @@ self.addEventListener('push', function(event) {
          body: data.body,
          icon: data.icon || '/apple-touch-icon.png',
          image: data.image,
-         data: { url: data.url || '/' }
+         data: { url: data.data?.url || data.url || '/' }
      };
      event.waitUntil(self.registration.showNotification(title, options));
   } catch(e) {
